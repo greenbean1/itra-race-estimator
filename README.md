@@ -29,19 +29,40 @@ streamlit run main.py
 
 3. Click "Get Performance Index" to retrieve the data.
 
-## Deployment to Streamlit Cloud
+## Manual Deployment to Streamlit Cloud
 
-1. Fork this repository to your GitHub account.
+### Prerequisites
+- A GitHub account
+- A Streamlit Cloud account (sign up at https://share.streamlit.io)
 
-2. Visit [Streamlit Cloud](https://share.streamlit.io) and sign in with your GitHub account.
+### Step 1: Prepare Your Repository
+1. Fork this repository to your GitHub account:
+   - Visit the repository page
+   - Click the "Fork" button in the top-right corner
+   - Select your account as the destination
 
-3. Click on "New app" and select this repository.
+### Step 2: Connect to Streamlit Cloud
+1. Visit [Streamlit Cloud](https://share.streamlit.io)
+2. Sign in with your GitHub account
+3. Click "New app" in the top-right corner
 
-4. Set the following deployment settings:
+### Step 3: Configure Deployment
+1. Select your forked repository from the list
+2. Configure the deployment settings:
    - Main file path: `main.py`
    - Python version: 3.11
+   - Branch: `main` (or your default branch)
 
-5. Click "Deploy!" and wait for the deployment to complete.
+### Step 4: Deploy
+1. Click "Deploy!"
+2. Wait for the deployment process to complete
+3. Your app will be available at: `https://[your-app-name].streamlit.app`
+
+### Troubleshooting
+- If the deployment fails, check the build logs in Streamlit Cloud
+- Verify that all dependencies are correctly listed in `requirements.txt`
+- Ensure the Python version matches (3.11)
+- Check if all environment variables are properly set
 
 ## Project Structure
 

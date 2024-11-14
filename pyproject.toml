@@ -1,11 +1,11 @@
-[project]
+[tool.poetry]
 name = "repl-nix-itra-performance-index-scraper"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.11"
-dependencies = [
-    "beautifulsoup4>=4.12.3",
-    "requests>=2.32.3",
-    "streamlit>=1.40.1",
-    "trafilatura>=1.12.2",
-]
+
+[tool.poetry.dependencies]
+beautifulsoup4 = ">=4.12.3"
+requests = ">=2.32.3"
+streamlit = ">=1.40.1"
+trafilatura = ">=1.12.2"

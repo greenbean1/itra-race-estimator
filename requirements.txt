@@ -2,11 +2,3 @@ beautifulsoup4>=4.12.3
 requests>=2.32.3
 streamlit>=1.40.1
 trafilatura>=1.12.2
-beautifulsoup4
-requests
-streamlit
-trafilatura
-beautifulsoup4>=4.12.3
-requests>=2.32.3
-streamlit>=1.40.1
-trafilatura>=1.12.2
