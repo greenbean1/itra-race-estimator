@@ -85,26 +85,26 @@ def scrape_itra_results(url: str) -> List[Dict]:
                     result['time'] = 'N/A'
                 logger.debug("Extracted time: %s", result['time'])
 
-                # Extract age (index 3, accounting for rowspan)
-                try:
-                    result['age'] = columns[3].get_text(strip=True)
-                except (IndexError, AttributeError):
-                    result['age'] = 'N/A'
+                # After extracting time, check for and skip race score column
+                race_score_cell = next((col for col in columns if 'rowspan' in col.attrs), None)
+                if race_score_cell:
+                    # Adjust column indices for remaining fields when race score cell is present
+                    age_index = 4  # Skip the race score cell
+                    gender_index = 5
+                    nationality_index = 6
+                else:
+                    # Normal column indices when no race score cell
+                    age_index = 3
+                    gender_index = 4
+                    nationality_index = 5
+
+                # Use these dynamic indices for remaining extractions
+                result['age'] = columns[age_index].get_text(strip=True) if len(columns) > age_index else 'N/A'
+                result['gender'] = columns[gender_index].get_text(strip=True) if len(columns) > gender_index else 'N/A'
+                result['nationality'] = columns[nationality_index].get_text(strip=True).split()[-1] if len(columns) > nationality_index else 'N/A'
+
                 logger.debug("Extracted age: %s", result['age'])
-
-                # Extract gender (index 4)
-                try:
-                    result['gender'] = columns[4].get_text(strip=True)
-                except (IndexError, AttributeError):
-                    result['gender'] = 'N/A'
                 logger.debug("Extracted gender: %s", result['gender'])
-
-                # Extract nationality (index 5)
-                try:
-                    nationality_cell = columns[5]
-                    result['nationality'] = nationality_cell.get_text(strip=True).split()[-1] if nationality_cell else 'N/A'
-                except (IndexError, AttributeError):
-                    result['nationality'] = 'N/A'
                 logger.debug("Extracted nationality: %s", result['nationality'])
 
                 results.append(result)
