@@ -33,37 +33,50 @@ def scrape_itra_results(url: str) -> List[Dict]:
         soup = BeautifulSoup(response.text, 'html.parser')
         results = []
 
-        # Find the results container (adjust based on ITRA's structure)
-        # Note: These selectors need to be updated with actual ITRA HTML structure
-        runners_table = soup.select_one('.race-results-table, .results-container table')
+        # Find the results table using the specific ID
+        runners_table = soup.select_one('#RunnerRaceResults')
         if not runners_table:
             raise Exception("Could not find results table on the page")
 
-        runners = runners_table.select('tbody tr')[:3]  # Get top 3 runners
+        # Get top 3 runners (skip header row)
+        runners = runners_table.select('tbody tr')[:3]
         
         for index, runner in enumerate(runners, 1):
             try:
-                # Extract profile link if available
-                name_cell = runner.select_one('td.runner-name, td.athlete-name')
-                profile_link = name_cell.find('a') if name_cell else None
-                profile_url = urljoin(url, profile_link['href']) if profile_link and profile_link.get('href') else 'N/A'
+                # Get all td elements
+                columns = runner.find_all('td')
+                if len(columns) < 7:  # Ensure we have all required columns
+                    continue
+
+                # Extract profile link and name from second column
+                name_cell = columns[1]
+                profile_link = name_cell.find('a')
                 
-                # Extract all required fields with fallback to N/A
+                # Process profile link
+                if profile_link and profile_link.get('href'):
+                    profile_url = urljoin('https://itra.run', profile_link['href'])
+                else:
+                    profile_url = 'N/A'
+                
+                # Extract name (text after the img tag)
+                name = profile_link.get_text(strip=True) if profile_link else 'N/A'
+                
+                # Extract nationality (text after the img tag in last column)
+                nationality_cell = columns[-1]
+                nationality = nationality_cell.get_text(strip=True) if nationality_cell else 'N/A'
+                
+                # Build result dictionary with all required fields
                 result = {
                     'position': str(index),
-                    'name': (name_cell.get_text(strip=True) if name_cell else 'N/A'),
+                    'name': name,
                     'profile_link': profile_url,
-                    'time': (runner.select_one('td.finish-time, td.time').get_text(strip=True) 
-                            if runner.select_one('td.finish-time, td.time') else 'N/A'),
-                    'age': (runner.select_one('td.age').get_text(strip=True) 
-                           if runner.select_one('td.age') else 'N/A'),
-                    'gender': (runner.select_one('td.gender').get_text(strip=True) 
-                             if runner.select_one('td.gender') else 'N/A'),
-                    'nationality': (runner.select_one('td.nationality').get_text(strip=True) 
-                                  if runner.select_one('td.nationality') else 'N/A')
+                    'time': columns[2].get_text(strip=True) if len(columns) > 2 else 'N/A',
+                    'age': columns[4].get_text(strip=True) if len(columns) > 4 else 'N/A',
+                    'gender': columns[5].get_text(strip=True) if len(columns) > 5 else 'N/A',
+                    'nationality': nationality
                 }
                 results.append(result)
-            except AttributeError:
+            except AttributeError as e:
                 # Handle missing data for individual runner
                 continue
 
