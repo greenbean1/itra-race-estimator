@@ -8,6 +8,21 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+def get_performance_index(profile_url: str, headers: Dict) -> str:
+    """
+    Extracts the ITRA Performance Index from a runner's profile page.
+    Returns 'N/A' if the index is not available or if an error occurs.
+    """
+    try:
+        response = requests.get(profile_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        index_span = soup.find('span', class_='level-count')
+        return index_span.text.strip() if index_span else 'N/A'
+    except Exception as e:
+        logger.error(f"Error fetching performance index: {str(e)}")
+        return 'N/A'
+
 def scrape_itra_results(url: str) -> List[Dict]:
     """
     Scrapes ITRA race results for top 3 runners.
@@ -70,12 +85,17 @@ def scrape_itra_results(url: str) -> List[Dict]:
                     if profile_link and profile_link.get('href'):
                         result['profile_link'] = urljoin('https://itra.run', profile_link['href'])
                         result['name'] = profile_link.get_text(strip=True).strip()
+                        # Fetch performance index from profile page
+                        result['performance_index'] = get_performance_index(result['profile_link'], headers)
+                        logger.debug("Extracted performance index: %s", result['performance_index'])
                     else:
                         result['profile_link'] = 'N/A'
                         result['name'] = 'N/A'
+                        result['performance_index'] = 'N/A'
                 except (IndexError, AttributeError):
                     result['profile_link'] = 'N/A'
                     result['name'] = 'N/A'
+                    result['performance_index'] = 'N/A'
                 logger.debug("Extracted name: %s, profile_link: %s", result['name'], result['profile_link'])
 
                 # Extract time (index 2)
