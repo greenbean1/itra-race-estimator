@@ -44,9 +44,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td>${escapeHtml(runner.position)}</td>
                     <td>${escapeHtml(runner.name)}</td>
                     <td>${escapeHtml(runner.time)}</td>
-                    <td>${escapeHtml(runner.category)}</td>
+                    <td>${escapeHtml(runner.age)}</td>
+                    <td>${escapeHtml(runner.gender)}</td>
+                    <td>${escapeHtml(runner.nationality)}</td>
+                    <td>${runner.profile_link !== 'N/A' ? 
+                        `<a href="${escapeHtml(runner.profile_link)}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <i data-feather="external-link"></i> View
+                        </a>` : 'N/A'
+                    }</td>
                 `;
                 resultsBody.appendChild(row);
+                feather.replace();
             });
 
             resultsContainer.classList.remove('d-none');
@@ -61,6 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Helper function to escape HTML and prevent XSS
 function escapeHtml(unsafe) {
+    if (!unsafe) return 'N/A';
     return unsafe
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
