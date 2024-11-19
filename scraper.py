@@ -54,53 +54,63 @@ def scrape_itra_results(url: str) -> List[Dict]:
                 logger.debug("Processing runner row with %d columns", len(columns))
                 logger.debug("Row HTML structure: %s", runner.prettify())
 
-                # Extract values with debug logging
-                position = columns[0].get_text(strip=True)
-                logger.debug("Extracted position: %s", position)
+                result = {}
 
-                # Extract profile link and name from second column
-                name_cell = columns[1]
-                profile_link = name_cell.find('a')
-                
-                # Process profile link and name
-                if profile_link and profile_link.get('href'):
-                    profile_url = urljoin('https://itra.run', profile_link['href'])
-                    name = profile_link.get_text(strip=True).strip()
-                else:
-                    profile_url = 'N/A'
-                    name = 'N/A'
-                logger.debug("Extracted name: %s, profile_url: %s", name, profile_url)
+                # Extract position (index 0)
+                try:
+                    result['position'] = columns[0].get_text(strip=True)
+                except (IndexError, AttributeError):
+                    result['position'] = 'N/A'
+                logger.debug("Extracted position: %s", result['position'])
 
-                # Extract time
-                time = columns[2].get_text(strip=True)
-                logger.debug("Extracted time: %s", time)
+                # Extract name and profile link (index 1)
+                try:
+                    name_cell = columns[1]
+                    profile_link = name_cell.find('a')
+                    if profile_link and profile_link.get('href'):
+                        result['profile_link'] = urljoin('https://itra.run', profile_link['href'])
+                        result['name'] = profile_link.get_text(strip=True).strip()
+                    else:
+                        result['profile_link'] = 'N/A'
+                        result['name'] = 'N/A'
+                except (IndexError, AttributeError):
+                    result['profile_link'] = 'N/A'
+                    result['name'] = 'N/A'
+                logger.debug("Extracted name: %s, profile_link: %s", result['name'], result['profile_link'])
 
-                # Extract age (index 4 after race score column)
-                age = columns[4].get_text(strip=True)
-                logger.debug("Extracted age: %s", age)
+                # Extract time (index 2)
+                try:
+                    result['time'] = columns[2].get_text(strip=True)
+                except (IndexError, AttributeError):
+                    result['time'] = 'N/A'
+                logger.debug("Extracted time: %s", result['time'])
 
-                # Extract gender
-                gender = columns[5].get_text(strip=True)
-                logger.debug("Extracted gender: %s", gender)
+                # Extract age (index 3, accounting for rowspan)
+                try:
+                    result['age'] = columns[3].get_text(strip=True)
+                except (IndexError, AttributeError):
+                    result['age'] = 'N/A'
+                logger.debug("Extracted age: %s", result['age'])
 
-                # Extract nationality
-                nationality_cell = columns[6]
-                nationality = nationality_cell.get_text(strip=True).split()[-1] if nationality_cell else 'N/A'
-                logger.debug("Extracted nationality: %s", nationality)
-                
-                # Build result dictionary with all required fields
-                result = {
-                    'position': position,
-                    'name': name,
-                    'profile_link': profile_url,
-                    'time': time,
-                    'age': age,
-                    'gender': gender,
-                    'nationality': nationality
-                }
+                # Extract gender (index 4)
+                try:
+                    result['gender'] = columns[4].get_text(strip=True)
+                except (IndexError, AttributeError):
+                    result['gender'] = 'N/A'
+                logger.debug("Extracted gender: %s", result['gender'])
+
+                # Extract nationality (index 5)
+                try:
+                    nationality_cell = columns[5]
+                    result['nationality'] = nationality_cell.get_text(strip=True).split()[-1] if nationality_cell else 'N/A'
+                except (IndexError, AttributeError):
+                    result['nationality'] = 'N/A'
+                logger.debug("Extracted nationality: %s", result['nationality'])
+
                 results.append(result)
-                logger.debug("Successfully added result for runner: %s", name)
-            except (AttributeError, IndexError) as e:
+                logger.debug("Successfully added result for runner: %s", result['name'])
+
+            except Exception as e:
                 logger.error("Error processing runner row: %s", str(e))
                 logger.debug("Row HTML structure: %s", runner.prettify())
                 continue
