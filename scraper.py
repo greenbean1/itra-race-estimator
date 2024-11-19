@@ -51,40 +51,57 @@ def scrape_itra_results(url: str) -> List[Dict]:
             try:
                 # Get all td elements
                 columns = runner.find_all('td')
-                if len(columns) < 7:  # Ensure we have all required columns
-                    logger.debug("Row HTML structure: %s", runner.prettify())
-                    continue
+                logger.debug("Processing runner row with %d columns", len(columns))
+                logger.debug("Row HTML structure: %s", runner.prettify())
+
+                # Extract values with debug logging
+                position = columns[0].get_text(strip=True)
+                logger.debug("Extracted position: %s", position)
 
                 # Extract profile link and name from second column
                 name_cell = columns[1]
                 profile_link = name_cell.find('a')
                 
-                # Process profile link
+                # Process profile link and name
                 if profile_link and profile_link.get('href'):
                     profile_url = urljoin('https://itra.run', profile_link['href'])
+                    name = profile_link.get_text(strip=True).strip()
                 else:
                     profile_url = 'N/A'
-                
-                # Extract name (text after the img tag)
-                name = profile_link.get_text(strip=True).strip() if profile_link else 'N/A'
-                
-                # Extract nationality (take last word which should be the country code)
+                    name = 'N/A'
+                logger.debug("Extracted name: %s, profile_url: %s", name, profile_url)
+
+                # Extract time
+                time = columns[2].get_text(strip=True)
+                logger.debug("Extracted time: %s", time)
+
+                # Extract age (index 4 after race score column)
+                age = columns[4].get_text(strip=True)
+                logger.debug("Extracted age: %s", age)
+
+                # Extract gender
+                gender = columns[5].get_text(strip=True)
+                logger.debug("Extracted gender: %s", gender)
+
+                # Extract nationality
                 nationality_cell = columns[6]
                 nationality = nationality_cell.get_text(strip=True).split()[-1] if nationality_cell else 'N/A'
+                logger.debug("Extracted nationality: %s", nationality)
                 
                 # Build result dictionary with all required fields
                 result = {
-                    'position': columns[0].get_text(strip=True),
+                    'position': position,
                     'name': name,
                     'profile_link': profile_url,
-                    'time': columns[2].get_text(strip=True),
-                    'age': columns[4].get_text(strip=True),
-                    'gender': columns[5].get_text(strip=True),
+                    'time': time,
+                    'age': age,
+                    'gender': gender,
                     'nationality': nationality
                 }
                 results.append(result)
-            except AttributeError as e:
-                logger.debug("Error processing runner row: %s", str(e))
+                logger.debug("Successfully added result for runner: %s", name)
+            except (AttributeError, IndexError) as e:
+                logger.error("Error processing runner row: %s", str(e))
                 logger.debug("Row HTML structure: %s", runner.prettify())
                 continue
 
@@ -92,6 +109,7 @@ def scrape_itra_results(url: str) -> List[Dict]:
             logger.debug("Table HTML structure: %s", runners_table.prettify())
             raise Exception("No valid results found on the page")
 
+        logger.debug("Successfully extracted %d results", len(results))
         return results
 
     except Exception as e:
