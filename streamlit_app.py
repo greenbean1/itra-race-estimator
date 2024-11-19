@@ -2,7 +2,12 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
+import trafilatura
 from scraper import scrape_itra_results
+import os
+
+# Ensure the PORT environment variable is set
+os.environ['PORT'] = '8501'
 
 # Page configuration
 st.set_page_config(
@@ -18,6 +23,9 @@ st.markdown("""
         max-width: 1200px;
         margin: 0 auto;
     }
+    .stButton>button {
+        width: 100%;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -25,11 +33,12 @@ def normalize_time(time_str):
     try:
         # Convert HH:MM:SS to seconds since race start
         if time_str == 'N/A':
-            return 'N/A'
+            return None
         time_parts = time_str.split(':')
-        return str(timedelta(hours=int(time_parts[0]), minutes=int(time_parts[1]), seconds=int(time_parts[2])))
+        total_seconds = int(time_parts[0]) * 3600 + int(time_parts[1]) * 60 + int(time_parts[2])
+        return total_seconds
     except (ValueError, IndexError):
-        return 'N/A'
+        return None
 
 def get_age_bucket(age):
     try:
@@ -40,87 +49,134 @@ def get_age_bucket(age):
     except (ValueError, TypeError):
         return 'Unknown'
 
-# Title
-st.title("Trail Race Results")
+def format_time(seconds):
+    if seconds is None:
+        return 'N/A'
+    return str(timedelta(seconds=seconds))
 
-# URL input
+# Title and Description
+st.title("🏃 Trail Race Results Analyzer")
+st.markdown("""
+Extract and analyze race results from ITRA (International Trail Running Association).
+Enter a race results URL below to get started.
+""")
+
+# URL input with example
 url = st.text_input(
     "Enter ITRA race results URL",
-    placeholder="https://itra.run/Races/RaceResults/..."
+    placeholder="https://itra.run/Races/RaceResults/70K/2024/94006",
+    help="Example: https://itra.run/Races/RaceResults/70K/2024/94006"
 )
 
 # Submit button
-if st.button("Get Results"):
+if st.button("📊 Analyze Results"):
     if url:
         try:
-            with st.spinner("Fetching race results..."):
+            with st.spinner("🔄 Fetching race results..."):
                 results = scrape_itra_results(url)
                 
                 if results:
                     # Convert results to DataFrame
                     df = pd.DataFrame(results)
                     
-                    # Reorder columns
-                    columns = ['position', 'name', 'time', 'performance_index', 'age', 'gender', 'nationality', 'profile_link']
-                    df = df[columns]
+                    # Convert time strings to normalized seconds
+                    df['time_seconds'] = df['time'].apply(normalize_time)
+                    
+                    # Create age buckets
+                    df['age_group'] = df['age'].apply(get_age_bucket)
                     
                     # Display results table
-                    st.subheader("Top 3 Runners")
+                    st.subheader("📊 Race Results")
+                    
+                    # Format the display DataFrame
+                    display_df = df.copy()
+                    display_df['time'] = display_df['time_seconds'].apply(format_time)
+                    
                     st.dataframe(
-                        df,
+                        display_df[[
+                            'position', 'name', 'time', 'performance_index',
+                            'age', 'gender', 'nationality'
+                        ]],
                         column_config={
-                            "profile_link": st.column_config.LinkColumn("Profile"),
-                            "performance_index": st.column_config.Column("ITRA Index", help="Runner's ITRA Performance Index"),
+                            "performance_index": "ITRA Index",
+                            "time": "Finish Time",
                         },
                         hide_index=True,
                     )
 
-                    if not df.empty:
-                        # Create normalized time column
-                        df['normalized_time'] = df['time'].apply(normalize_time)
+                    # Add filters in columns
+                    st.subheader("🔍 Filter Results")
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        selected_genders = st.multiselect(
+                            'Gender Filter',
+                            options=sorted(df['gender'].unique()),
+                            default=sorted(df['gender'].unique())
+                        )
+                    
+                    with col2:
+                        selected_nations = st.multiselect(
+                            'Nationality Filter',
+                            options=sorted(df['nationality'].unique()),
+                            default=sorted(df['nationality'].unique())
+                        )
+                    
+                    with col3:
+                        selected_age_groups = st.multiselect(
+                            'Age Group Filter',
+                            options=sorted(df['age_group'].unique()),
+                            default=sorted(df['age_group'].unique())
+                        )
+
+                    # Filter data based on selections
+                    filtered_df = df[
+                        df['gender'].isin(selected_genders) &
+                        df['nationality'].isin(selected_nations) &
+                        df['age_group'].isin(selected_age_groups)
+                    ]
+
+                    # Create visualizations
+                    if not filtered_df.empty:
+                        st.subheader("📈 Performance Analysis")
                         
-                        # Create age buckets
-                        df['age_group'] = df['age'].apply(get_age_bucket)
+                        # Time vs Position plot
+                        fig1 = px.scatter(
+                            filtered_df,
+                            x='time_seconds',
+                            y='position',
+                            color='gender',
+                            hover_data=['name', 'age', 'nationality'],
+                            title='Finish Time vs Position',
+                            labels={'time_seconds': 'Finish Time (HH:MM:SS)',
+                                   'position': 'Position'}
+                        )
+                        fig1.update_traces(marker=dict(size=10))
+                        st.plotly_chart(fig1, use_container_width=True)
                         
-                        # Add filters
-                        st.subheader("Interactive Analysis")
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            selected_genders = st.multiselect('Gender', df['gender'].unique())
-                        with col2:
-                            selected_nations = st.multiselect('Nationality', df['nationality'].unique())
-                        with col3:
-                            selected_age_groups = st.multiselect('Age Group', sorted(df['age_group'].unique()))
-                        
-                        # Filter data based on selections
-                        filtered_df = df.copy()
-                        if selected_genders:
-                            filtered_df = filtered_df[filtered_df['gender'].isin(selected_genders)]
-                        if selected_nations:
-                            filtered_df = filtered_df[filtered_df['nationality'].isin(selected_nations)]
-                        if selected_age_groups:
-                            filtered_df = filtered_df[filtered_df['age_group'].isin(selected_age_groups)]
-                        
-                        # Create scatterplot only if we have valid performance indices
-                        valid_performance = filtered_df['performance_index'] != 'N/A'
-                        valid_time = filtered_df['normalized_time'] != 'N/A'
-                        plot_df = filtered_df[valid_performance & valid_time].copy()
-                        
-                        if not plot_df.empty:
-                            fig = px.scatter(plot_df,
-                                x='normalized_time',
-                                y='performance_index',
-                                color='gender',
-                                hover_data=['name', 'age', 'nationality'],
-                                title='Runner Performance vs Time'
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                        else:
-                            st.warning("No valid data available for visualization after filtering.")
+                        # Age distribution
+                        fig2 = px.histogram(
+                            filtered_df,
+                            x='age_group',
+                            color='gender',
+                            title='Age Distribution',
+                            labels={'age_group': 'Age Group',
+                                   'count': 'Number of Runners'}
+                        )
+                        st.plotly_chart(fig2, use_container_width=True)
+                    else:
+                        st.warning("No data available for the selected filters.")
                 else:
                     st.warning("No results found. Please check the URL and try again.")
                     
         except Exception as e:
             st.error(f"Error: {str(e)}")
     else:
-        st.error("Please enter a valid URL")
+        st.error("Please enter a valid ITRA race results URL")
+
+# Footer
+st.markdown("""
+---
+💡 **Tip**: The analysis includes finish times, age groups, and nationality distributions.
+You can use the filters above to focus on specific groups of runners.
+""")
