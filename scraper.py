@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from typing import Dict, List
 from urllib.parse import urljoin
 import logging
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -14,13 +15,58 @@ def get_performance_index(profile_url: str, headers: Dict) -> str:
     Returns 'N/A' if the index is not available or if an error occurs.
     """
     try:
+        logger.debug(f"Fetching performance index from profile URL: {profile_url}")
+        
+        # Ensure proper URL joining
+        if not profile_url.startswith(('http://', 'https://')):
+            profile_url = urljoin('https://itra.run', profile_url)
+            logger.debug(f"Updated profile URL to absolute URL: {profile_url}")
+
         response = requests.get(profile_url, headers=headers, timeout=10)
         response.raise_for_status()
+        logger.debug(f"Profile page response status code: {response.status_code}")
+
         soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Try multiple selectors to find the performance index
         index_span = soup.find('span', class_='level-count')
-        return index_span.text.strip() if index_span else 'N/A'
+        if not index_span:
+            logger.debug("Performance index not found with class 'level-count', trying alternative selectors")
+            # Try alternative selectors
+            index_span = soup.find('span', class_='itra-index') or \
+                        soup.find('div', class_='performance-index') or \
+                        soup.find('div', text=lambda t: t and 'Performance Index' in t)
+
+        if index_span:
+            index_value = index_span.text.strip()
+            logger.debug(f"Found performance index value: {index_value}")
+            return index_value
+        else:
+            # Check if the content might be loaded via JavaScript
+            logger.debug("Performance index not found in static HTML, checking for JavaScript data")
+            script_data = soup.find('script', type='application/json')
+            if script_data:
+                try:
+                    json_data = json.loads(script_data.string)
+                    if 'performanceIndex' in json_data:
+                        return str(json_data['performanceIndex'])
+                except json.JSONDecodeError:
+                    logger.error("Failed to parse JavaScript data")
+            
+            logger.warning(f"No performance index found for profile: {profile_url}")
+            return 'N/A'
+
+    except requests.Timeout:
+        logger.error(f"Timeout while fetching profile: {profile_url}")
+        return 'N/A'
+    except requests.ConnectionError:
+        logger.error(f"Connection error while fetching profile: {profile_url}")
+        return 'N/A'
+    except requests.RequestException as e:
+        logger.error(f"Request error while fetching profile: {profile_url}, error: {str(e)}")
+        return 'N/A'
     except Exception as e:
-        logger.error(f"Error fetching performance index: {str(e)}")
+        logger.error(f"Unexpected error while fetching performance index: {str(e)}")
         return 'N/A'
 
 def scrape_itra_results(url: str) -> List[Dict]:
