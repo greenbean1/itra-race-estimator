@@ -2,6 +2,11 @@ import requests
 from bs4 import BeautifulSoup
 from typing import Dict, List
 from urllib.parse import urljoin
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 def scrape_itra_results(url: str) -> List[Dict]:
     """
@@ -36,16 +41,18 @@ def scrape_itra_results(url: str) -> List[Dict]:
         # Find the results table using the specific ID
         runners_table = soup.select_one('#RunnerRaceResults')
         if not runners_table:
+            logger.debug("HTML content: %s", soup.prettify())
             raise Exception("Could not find results table on the page")
 
-        # Get top 3 runners (skip header row)
-        runners = runners_table.select('tbody tr')[:3]
+        # Get top 3 runners (skip header, get next 3 rows)
+        runners = runners_table.select('tr')[1:4]
         
-        for index, runner in enumerate(runners, 1):
+        for runner in runners:
             try:
                 # Get all td elements
                 columns = runner.find_all('td')
                 if len(columns) < 7:  # Ensure we have all required columns
+                    logger.debug("Row HTML structure: %s", runner.prettify())
                     continue
 
                 # Extract profile link and name from second column
@@ -59,31 +66,34 @@ def scrape_itra_results(url: str) -> List[Dict]:
                     profile_url = 'N/A'
                 
                 # Extract name (text after the img tag)
-                name = profile_link.get_text(strip=True) if profile_link else 'N/A'
+                name = profile_link.get_text(strip=True).strip() if profile_link else 'N/A'
                 
-                # Extract nationality (text after the img tag in last column)
-                nationality_cell = columns[-1]
-                nationality = nationality_cell.get_text(strip=True) if nationality_cell else 'N/A'
+                # Extract nationality (take last word which should be the country code)
+                nationality_cell = columns[6]
+                nationality = nationality_cell.get_text(strip=True).split()[-1] if nationality_cell else 'N/A'
                 
                 # Build result dictionary with all required fields
                 result = {
-                    'position': str(index),
+                    'position': columns[0].get_text(strip=True),
                     'name': name,
                     'profile_link': profile_url,
-                    'time': columns[2].get_text(strip=True) if len(columns) > 2 else 'N/A',
-                    'age': columns[4].get_text(strip=True) if len(columns) > 4 else 'N/A',
-                    'gender': columns[5].get_text(strip=True) if len(columns) > 5 else 'N/A',
+                    'time': columns[2].get_text(strip=True),
+                    'age': columns[4].get_text(strip=True),
+                    'gender': columns[5].get_text(strip=True),
                     'nationality': nationality
                 }
                 results.append(result)
             except AttributeError as e:
-                # Handle missing data for individual runner
+                logger.debug("Error processing runner row: %s", str(e))
+                logger.debug("Row HTML structure: %s", runner.prettify())
                 continue
 
         if not results:
+            logger.debug("Table HTML structure: %s", runners_table.prettify())
             raise Exception("No valid results found on the page")
 
         return results
 
     except Exception as e:
+        logger.error("Scraping error: %s", str(e))
         raise Exception(f"Failed to scrape results: {str(e)}")
